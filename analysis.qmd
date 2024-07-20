@@ -1,4 +1,69 @@
 ---
 title: "Two Parameters"
 author: "Ivy Spratt"
+execute: 
+  echo: false
 ---
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+
+library(tidyverse)
+library(primer.data)
+library(tidybayes)
+library(brms)
+library(gtsummary)
+```
+
+
+```{r}
+#| cache: TRUE
+
+ch5 <- nhanes |>
+  filter(sex == "Male", age >= 18) |>
+  select(height) |>
+  drop_na()
+
+fit_male_height <- brm(
+                       formula = height ~ 1,
+                       data = ch5,
+                       family = gaussian(),
+                       silent = 2,
+                       refresh = 0,
+                       seed = 12
+                      )
+```
+
+```{r}
+#| label: plot
+
+ndata <- tibble(.rows = 1)
+
+fit_male_height |>
+  add_predicted_draws(newdata = ndata) |>
+    ggplot(aes(x = .prediction)) +
+      geom_histogram(aes(y = after_stat(count/sum(count))), bins = 100) +
+      scale_x_continuous(labels = scales::number_format()) +
+      scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+      labs(title = "Posterior for Height of Random Male",
+           subtitle = "Uncertainty for a single individual is much greater than for the expected value",
+           x = "Height (cm)",
+           y = "Probability",
+           caption = "Data source: NHANES")
+```
+
+Data from the National Health and Nutrition Examination Survey conducted from 2009 to 2011 by the Centers for Disease Control and Prevention includes 15 variables. Using the sex and height variables, we are trying to answer the question: "What is the probability that the next adult male we meet will be taller than 180 centimeters? " The data may be not represented perfectly as the survey was optional, and people who may not want to take it would not be represented. To answer this, we are modeling height using an intercept-only regression. Using this, we determined that there is a 30% probability that the next man we meet will be taller than 180 centimeters.
+
+
+```{r}
+tbl_regression(fit_male_height, intercept = TRUE)
+```
+
+```{r}
+fit_male_height |>
+  add_predicted_draws(newdata = ndata) |>
+  mutate(tall = if_else(.prediction > 180, TRUE, FALSE)) |>
+  summarize(odds = mean(tall))
+```
+
